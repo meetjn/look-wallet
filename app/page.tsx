@@ -21,6 +21,11 @@ import {
   USDC_MINT_ADDRESS,
   LOOK_MINT_ADDRESS,
 } from "@/lib/solana-utils";
+import {
+  getCachedWallet,
+  setCachedWallet,
+  clearCachedWallet,
+} from "@/lib/wallet-cache";
 import type { ActionState, FiatRates, BalanceSnapshot } from "@/types";
 import QRCode from "qrcode";
 import jsQR from "jsqr";
@@ -127,6 +132,7 @@ export default function WalletScreen() {
   /**
    * @notice Initializes MetaKeep SDK when available
    * @dev Following the exact MetaKeep SDK pattern to avoid mobile OTP popup issues
+   * @dev SDK instance is cached to avoid re-initialization on every render
    */
   const initializeSdk = useCallback(() => {
     if (typeof window === "undefined" || sdk) return;
@@ -151,6 +157,7 @@ export default function WalletScreen() {
   /**
    * @notice Ensures a MetaKeep wallet is connected
    * @dev Still used by send / swap flows, but Buy LOOK / Buy SOL just redirect now
+   * @dev Uses cached wallet address to avoid re-authentication when possible
    */
   const ensureWallet = useCallback(async (): Promise<boolean> => {
     if (!sdk) {
@@ -162,12 +169,24 @@ export default function WalletScreen() {
     if (walletAddress) {
       return true;
     }
+
+    // Check for cached wallet first
+    const cachedAddress = getCachedWallet();
+    if (cachedAddress) {
+      setWalletAddress(cachedAddress);
+      await refreshBalances(cachedAddress);
+      return true;
+    }
+
+    // No cached wallet, need to authenticate
     try {
       setIsConnecting(true);
       const result = await (sdk as any).getWallet();
       if (result.status === "SUCCESS" && result.wallet?.solAddress) {
-        setWalletAddress(result.wallet.solAddress);
-        await refreshBalances(result.wallet.solAddress);
+        const address = result.wallet.solAddress;
+        setWalletAddress(address);
+        setCachedWallet(address); // Cache the wallet address
+        await refreshBalances(address);
         setIsConnecting(false);
         return true;
       }
@@ -184,20 +203,37 @@ export default function WalletScreen() {
 
   /**
    * @notice Auto-connect MetaKeep wallet on landing page load
-   * @dev This mirrors the original behaviour while still swallowing errors gracefully
+   * @dev Uses cached wallet address to avoid re-authentication on page reload
+   * @dev Only calls getWallet() if no cached wallet is available
    */
   useEffect(() => {
-    if (!sdk || walletAddress) return;
+    if (walletAddress) return;
+
+    // Check for cached wallet first - no SDK needed for this
+    const cachedAddress = getCachedWallet();
+    if (cachedAddress) {
+      setWalletAddress(cachedAddress);
+      refreshBalances(cachedAddress).catch(console.error);
+      return;
+    }
+
+    // No cached wallet, wait for SDK and authenticate
+    if (!sdk) return;
+
     const connect = async () => {
       try {
         setIsConnecting(true);
         const result = await (sdk as any).getWallet();
         if (result.status === "SUCCESS" && result.wallet?.solAddress) {
-          setWalletAddress(result.wallet.solAddress);
-          await refreshBalances(result.wallet.solAddress);
+          const address = result.wallet.solAddress;
+          setWalletAddress(address);
+          setCachedWallet(address); // Cache the wallet address
+          await refreshBalances(address);
         }
       } catch (error) {
         console.warn("MetaKeep getWallet failed on landing", error);
+        // If authentication fails, clear any stale cache
+        clearCachedWallet();
       } finally {
         setIsConnecting(false);
       }
