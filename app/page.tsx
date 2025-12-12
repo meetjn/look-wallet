@@ -769,8 +769,8 @@ export default function WalletScreen() {
                 <Image
                   src="/account-logout.png"
                   alt={walletAddress ? "Logout" : "Login"}
-                  width={20}
-                  height={20}
+                  width={16}
+                  height={16}
                   className="header-icon"
                 />
               </button>
@@ -784,8 +784,8 @@ export default function WalletScreen() {
                 <Image
                   src="/qr-code-logo.png"
                   alt="QR Code"
-                  width={20}
-                  height={20}
+                  width={16}
+                  height={16}
                   className="header-icon"
                 />
               </button>
@@ -1100,9 +1100,9 @@ export default function WalletScreen() {
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            width: 36px;
-            height: 36px;
-            border-radius: 10px;
+            width: 28px;
+            height: 28px;
+            border-radius: 8px;
             border: 1px solid #2f2f32;
             background: #1f1f22;
             cursor: pointer;
@@ -1126,8 +1126,8 @@ export default function WalletScreen() {
           }
 
           .header-icon {
-            width: 20px;
-            height: 20px;
+            width: 16px;
+            height: 16px;
             object-fit: contain;
             filter: brightness(0) invert(1);
             opacity: 0.9;
