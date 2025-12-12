@@ -827,12 +827,14 @@ export default function WalletScreen() {
             <button
               onClick={() => setActiveModal("send")}
               className="action-btn"
+              disabled={!walletAddress}
             >
               <span>Send</span>
             </button>
             <button
               onClick={() => setActiveModal("receive")}
               className="action-btn"
+              disabled={!walletAddress}
             >
               <span>Receive</span>
             </button>
@@ -939,7 +941,7 @@ export default function WalletScreen() {
         </div>
 
         {/* Send Modal */}
-        {activeModal === "send" && (
+        {activeModal === "send" && walletAddress && (
           <div className="modal-overlay" onClick={() => setActiveModal(null)}>
             <div className="modal-content" onClick={(e) => e.stopPropagation()}>
               <div className="modal-header">
@@ -1004,7 +1006,7 @@ export default function WalletScreen() {
         )}
 
         {/* Receive Modal */}
-        {activeModal === "receive" && (
+        {activeModal === "receive" && walletAddress && (
           <div className="modal-overlay" onClick={() => setActiveModal(null)}>
             <div className="modal-content" onClick={(e) => e.stopPropagation()}>
               <div className="modal-header">
@@ -1129,12 +1131,13 @@ export default function WalletScreen() {
             width: 16px;
             height: 16px;
             object-fit: contain;
-            filter: brightness(0) invert(1);
-            opacity: 0.9;
+            filter: brightness(2) contrast(1.2) invert(1);
+            opacity: 0.8;
           }
 
           .header-icon-btn:hover:not(:disabled) .header-icon {
             opacity: 1;
+            filter: brightness(2.2) contrast(1.3) invert(1);
           }
 
           .balance-section {
@@ -1229,8 +1232,13 @@ export default function WalletScreen() {
             transition: all 0.2s;
           }
 
-          .action-btn:hover {
+          .action-btn:hover:not(:disabled) {
             background: #2a2a2d;
+          }
+
+          .action-btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
           }
 
           .assets-section {
