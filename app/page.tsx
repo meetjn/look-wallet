@@ -90,6 +90,8 @@ export default function WalletScreen() {
   const [isConnecting, setIsConnecting] = useState(false);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const scanLoopRef = useRef<number | undefined>(undefined);
+  /// @notice Flag to prevent auto-connect after manual logout
+  const hasManuallyLoggedOutRef = useRef<boolean>(false);
   /// @notice QR code data URL for receive
   const [qrCodeUrl, setQrCodeUrl] = useState<string>("");
   /// @notice Active modal view
@@ -205,9 +207,13 @@ export default function WalletScreen() {
    * @notice Auto-connect MetaKeep wallet on landing page load
    * @dev Uses cached wallet address to avoid re-authentication on page reload
    * @dev Only calls getWallet() if no cached wallet is available
+   * @dev Does NOT auto-connect if user has manually logged out
    */
   useEffect(() => {
     if (walletAddress) return;
+
+    // Don't auto-connect if user has manually logged out
+    if (hasManuallyLoggedOutRef.current) return;
 
     // Check for cached wallet first - no SDK needed for this
     const cachedAddress = getCachedWallet();
@@ -678,6 +684,54 @@ export default function WalletScreen() {
     }
   };
 
+  /**
+   * @notice Handles logout - clears cache and resets wallet state
+   * @notice Also handles login - re-initializes SDK and connects wallet when logged out
+   * @dev Sets flag to prevent auto-connect after manual logout
+   */
+  const handleLogoutOrLogin = async () => {
+    // If user is logged in, log them out
+    if (walletAddress) {
+      clearCachedWallet();
+      setWalletAddress(null);
+      setBalances({ usdc: 0, sol: 0, usd: 0 });
+      hasManuallyLoggedOutRef.current = true; // Prevent auto-connect after logout
+      setStatusMessage("Logged out successfully");
+      setTimeout(() => setStatusMessage(""), 2000);
+      return;
+    }
+
+    // If user is logged out, log them in (re-initialize SDK and connect)
+    if (!sdk) {
+      setStatusMessage(
+        "MetaKeep is still initializing. Please try again in a moment."
+      );
+      return;
+    }
+
+    try {
+      setIsConnecting(true);
+      setStatusMessage("Connecting wallet...");
+      const result = await (sdk as any).getWallet();
+      if (result.status === "SUCCESS" && result.wallet?.solAddress) {
+        const address = result.wallet.solAddress;
+        setWalletAddress(address);
+        setCachedWallet(address);
+        hasManuallyLoggedOutRef.current = false; // Reset flag after successful login
+        await refreshBalances(address);
+        setStatusMessage("Wallet connected successfully");
+        setTimeout(() => setStatusMessage(""), 2000);
+      } else {
+        setStatusMessage("Wallet connection failed. Please try again.");
+      }
+    } catch (error) {
+      console.warn("MetaKeep getWallet failed", error);
+      setStatusMessage("Wallet connection failed. Please retry.");
+    } finally {
+      setIsConnecting(false);
+    }
+  };
+
   return (
     <>
       <Script
@@ -704,18 +758,38 @@ export default function WalletScreen() {
               </div>
               <span className="brand-name">Look Wallet</span>
             </div>
-            <button
-              type="button"
-              className="menu-icon"
-              onClick={() => setActiveModal("receive")}
-              aria-label="Show wallet QR"
-            >
-              <span className="menu-qr">
-                <span />
-                <span />
-                <span />
-              </span>
-            </button>
+            <div className="header-actions">
+              <button
+                type="button"
+                className="header-icon-btn"
+                onClick={handleLogoutOrLogin}
+                aria-label={walletAddress ? "Logout" : "Login"}
+                disabled={isConnecting}
+              >
+                <Image
+                  src="/account-logout.png"
+                  alt={walletAddress ? "Logout" : "Login"}
+                  width={20}
+                  height={20}
+                  className="header-icon"
+                />
+              </button>
+              <button
+                type="button"
+                className="header-icon-btn"
+                onClick={() => setActiveModal("receive")}
+                aria-label="Show wallet QR"
+                disabled={!walletAddress}
+              >
+                <Image
+                  src="/qr-code-logo.png"
+                  alt="QR Code"
+                  width={20}
+                  height={20}
+                  className="header-icon"
+                />
+              </button>
+            </div>
           </header>
 
           {/* Balance Section */}
@@ -1016,29 +1090,51 @@ export default function WalletScreen() {
             color: #ffffff;
           }
 
-          .menu-icon {
+          .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+          }
+
+          .header-icon-btn {
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            width: 32px;
-            height: 32px;
+            width: 36px;
+            height: 36px;
             border-radius: 10px;
             border: 1px solid #2f2f32;
             background: #1f1f22;
             cursor: pointer;
             padding: 0;
+            transition: all 0.2s;
           }
 
-          .menu-qr {
-            display: grid;
-            grid-template-columns: repeat(3, 4px);
-            grid-gap: 2px;
+          .header-icon-btn:hover:not(:disabled) {
+            background: #2a2a2d;
+            border-color: #3f3f46;
+            transform: translateY(-1px);
           }
 
-          .menu-qr span {
-            width: 4px;
-            height: 4px;
-            background: #f6ad27;
+          .header-icon-btn:active:not(:disabled) {
+            transform: translateY(0);
+          }
+
+          .header-icon-btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+          }
+
+          .header-icon {
+            width: 20px;
+            height: 20px;
+            object-fit: contain;
+            filter: brightness(0) invert(1);
+            opacity: 0.9;
+          }
+
+          .header-icon-btn:hover:not(:disabled) .header-icon {
+            opacity: 1;
           }
 
           .balance-section {

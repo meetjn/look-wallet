@@ -43,3 +43,4 @@ interface DetectedBarcode {
 
 export {};
 
+

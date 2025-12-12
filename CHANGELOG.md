@@ -79,3 +79,4 @@
 - Custom slippage settings for swaps
 - Enhanced error recovery
 
+
