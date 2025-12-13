@@ -3,7 +3,34 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Script from "next/script";
 import Image from "next/image";
-import { LogOut, QrCode } from "lucide-react";
+import {
+  LogOut,
+  QrCode,
+  User,
+  Mail,
+  Send,
+  ArrowDownCircle,
+  ShoppingCart,
+  ArrowLeftRight,
+  Coins,
+  X,
+  Copy,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { Buffer } from "buffer";
 import {
   Connection,
@@ -99,6 +126,10 @@ export default function WalletScreen() {
   const [activeModal, setActiveModal] = useState<"send" | "receive" | null>(
     null
   );
+  /// @notice User email from MetaKeep
+  const [userEmail, setUserEmail] = useState<string | null>(null);
+  /// @notice Profile dropdown visibility
+  const [showProfileDropdown, setShowProfileDropdown] = useState(false);
 
   /// @notice Solana connection instance
   const connection = useMemo(() => new Connection(RPC_URL, "confirmed"), []);
@@ -185,10 +216,82 @@ export default function WalletScreen() {
     try {
       setIsConnecting(true);
       const result = await (sdk as any).getWallet();
+      console.log(
+        "MetaKeep getWallet FULL RESULT:",
+        JSON.stringify(result, null, 2)
+      );
       if (result.status === "SUCCESS" && result.wallet?.solAddress) {
         const address = result.wallet.solAddress;
         setWalletAddress(address);
         setCachedWallet(address); // Cache the wallet address
+
+        // Try to get user email from MetaKeep result
+        let email =
+          result.user?.email ||
+          result.wallet?.userEmail ||
+          result.email ||
+          result.userEmail ||
+          result.userInfo?.email ||
+          result.account?.email;
+
+        // If not in result, check ALL localStorage keys for email
+        if (!email && typeof window !== "undefined") {
+          console.log("Checking localStorage for email...");
+          for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key) {
+              try {
+                const value = localStorage.getItem(key);
+                if (value) {
+                  // Try to parse as JSON
+                  try {
+                    const parsed = JSON.parse(value);
+                    if (typeof parsed === "object" && parsed !== null) {
+                      const foundEmail =
+                        parsed.email ||
+                        parsed.userEmail ||
+                        parsed.user?.email ||
+                        parsed.userInfo?.email ||
+                        parsed.account?.email ||
+                        parsed.identifier;
+                      if (foundEmail && foundEmail.includes("@")) {
+                        email = foundEmail;
+                        console.log(
+                          `Found email in localStorage key "${key}":`,
+                          email
+                        );
+                        break;
+                      }
+                    }
+                  } catch (e) {
+                    // Not JSON, check if it's a plain email string
+                    if (value.includes("@") && value.includes(".")) {
+                      email = value;
+                      console.log(
+                        `Found email as plain string in key "${key}":`,
+                        email
+                      );
+                      break;
+                    }
+                  }
+                }
+              } catch (e) {
+                // Skip this key
+              }
+            }
+          }
+        }
+
+        if (email) {
+          console.log("Setting user email:", email);
+          setUserEmail(email);
+          if (typeof window !== "undefined") {
+            localStorage.setItem("metakeep_user_email", email);
+          }
+        } else {
+          console.warn("Email not found in MetaKeep result or localStorage");
+        }
+
         await refreshBalances(address);
         setIsConnecting(false);
         return true;
@@ -220,6 +323,35 @@ export default function WalletScreen() {
     const cachedAddress = getCachedWallet();
     if (cachedAddress) {
       setWalletAddress(cachedAddress);
+      // Try to get cached email from localStorage
+      if (typeof window !== "undefined") {
+        const cachedEmail = localStorage.getItem("metakeep_user_email");
+        if (cachedEmail) {
+          setUserEmail(cachedEmail);
+        } else {
+          // Try to find email in MetaKeep's localStorage keys
+          for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key && key.includes("metakeep")) {
+              try {
+                const value = localStorage.getItem(key);
+                if (value) {
+                  const parsed = JSON.parse(value);
+                  if (parsed.email || parsed.userEmail || parsed.user?.email) {
+                    const email =
+                      parsed.email || parsed.userEmail || parsed.user?.email;
+                    setUserEmail(email);
+                    localStorage.setItem("metakeep_user_email", email);
+                    break;
+                  }
+                }
+              } catch (e) {
+                // Not JSON, skip
+              }
+            }
+          }
+        }
+      }
       refreshBalances(cachedAddress).catch(console.error);
       return;
     }
@@ -235,6 +367,58 @@ export default function WalletScreen() {
           const address = result.wallet.solAddress;
           setWalletAddress(address);
           setCachedWallet(address); // Cache the wallet address
+          // Try to get user email from MetaKeep result or localStorage
+          // Log the result to debug email extraction
+          console.log("MetaKeep getWallet result:", result);
+          const email =
+            result.user?.email ||
+            result.wallet?.userEmail ||
+            result.email ||
+            result.userEmail ||
+            result.userInfo?.email ||
+            (typeof window !== "undefined" &&
+              localStorage.getItem("metakeep_user_email"));
+          // Also check MetaKeep's localStorage keys for email
+          if (!email && typeof window !== "undefined") {
+            for (let i = 0; i < localStorage.length; i++) {
+              const key = localStorage.key(i);
+              if (
+                key &&
+                (key.toLowerCase().includes("metakeep") ||
+                  key.toLowerCase().includes("user"))
+              ) {
+                try {
+                  const value = localStorage.getItem(key);
+                  if (value) {
+                    const parsed = JSON.parse(value);
+                    if (
+                      parsed.email ||
+                      parsed.userEmail ||
+                      parsed.user?.email ||
+                      parsed.userInfo?.email
+                    ) {
+                      const foundEmail =
+                        parsed.email ||
+                        parsed.userEmail ||
+                        parsed.user?.email ||
+                        parsed.userInfo?.email;
+                      setUserEmail(foundEmail);
+                      localStorage.setItem("metakeep_user_email", foundEmail);
+                      break;
+                    }
+                  }
+                } catch (e) {
+                  // Not JSON, skip
+                }
+              }
+            }
+          }
+          if (email) {
+            setUserEmail(email);
+            if (typeof window !== "undefined") {
+              localStorage.setItem("metakeep_user_email", email);
+            }
+          }
           await refreshBalances(address);
         }
       } catch (error) {
@@ -695,7 +879,12 @@ export default function WalletScreen() {
     if (walletAddress) {
       clearCachedWallet();
       setWalletAddress(null);
+      setUserEmail(null);
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("metakeep_user_email");
+      }
       setBalances({ usdc: 0, sol: 0, usd: 0 });
+      setShowProfileDropdown(false);
       hasManuallyLoggedOutRef.current = true; // Prevent auto-connect after logout
       setStatusMessage("Logged out successfully");
       setTimeout(() => setStatusMessage(""), 2000);
@@ -714,10 +903,82 @@ export default function WalletScreen() {
       setIsConnecting(true);
       setStatusMessage("Connecting wallet...");
       const result = await (sdk as any).getWallet();
+      console.log(
+        "MetaKeep getWallet FULL RESULT:",
+        JSON.stringify(result, null, 2)
+      );
       if (result.status === "SUCCESS" && result.wallet?.solAddress) {
         const address = result.wallet.solAddress;
         setWalletAddress(address);
         setCachedWallet(address);
+
+        // Try to get user email from MetaKeep result
+        let email =
+          result.user?.email ||
+          result.wallet?.userEmail ||
+          result.email ||
+          result.userEmail ||
+          result.userInfo?.email ||
+          result.account?.email;
+
+        // If not in result, check ALL localStorage keys for email
+        if (!email && typeof window !== "undefined") {
+          console.log("Checking localStorage for email...");
+          for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key) {
+              try {
+                const value = localStorage.getItem(key);
+                if (value) {
+                  // Try to parse as JSON
+                  try {
+                    const parsed = JSON.parse(value);
+                    if (typeof parsed === "object" && parsed !== null) {
+                      const foundEmail =
+                        parsed.email ||
+                        parsed.userEmail ||
+                        parsed.user?.email ||
+                        parsed.userInfo?.email ||
+                        parsed.account?.email ||
+                        parsed.identifier;
+                      if (foundEmail && foundEmail.includes("@")) {
+                        email = foundEmail;
+                        console.log(
+                          `Found email in localStorage key "${key}":`,
+                          email
+                        );
+                        break;
+                      }
+                    }
+                  } catch (e) {
+                    // Not JSON, check if it's a plain email string
+                    if (value.includes("@") && value.includes(".")) {
+                      email = value;
+                      console.log(
+                        `Found email as plain string in key "${key}":`,
+                        email
+                      );
+                      break;
+                    }
+                  }
+                }
+              } catch (e) {
+                // Skip this key
+              }
+            }
+          }
+        }
+
+        if (email) {
+          console.log("Setting user email:", email);
+          setUserEmail(email);
+          if (typeof window !== "undefined") {
+            localStorage.setItem("metakeep_user_email", email);
+          }
+        } else {
+          console.warn("Email not found in MetaKeep result or localStorage");
+        }
+
         hasManuallyLoggedOutRef.current = false; // Reset flag after successful login
         await refreshBalances(address);
         setStatusMessage("Wallet connected successfully");
@@ -760,24 +1021,62 @@ export default function WalletScreen() {
               <span className="brand-name">Look Wallet</span>
             </div>
             <div className="header-actions">
-              <button
-                type="button"
-                className="header-icon-btn"
+              <Button
+                variant="ghost"
+                size="icon"
                 onClick={() => setActiveModal("receive")}
                 aria-label="Show wallet QR"
                 disabled={!walletAddress}
+                className="h-7 w-7 bg-[#1f1f22] border border-[#2f2f32] hover:bg-[#2a2a2d]"
               >
-                <QrCode className="header-icon" size={16} color="#ffffff" />
-              </button>
-              <button
-                type="button"
-                className="header-icon-btn"
-                onClick={handleLogoutOrLogin}
-                aria-label={walletAddress ? "Logout" : "Login"}
-                disabled={isConnecting}
-              >
-                <LogOut className="header-icon" size={16} color="#ffffff" />
-              </button>
+                <QrCode size={16} className="text-white" />
+              </Button>
+              {walletAddress ? (
+                <DropdownMenu
+                  open={showProfileDropdown}
+                  onOpenChange={setShowProfileDropdown}
+                >
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      aria-label="Profile"
+                      disabled={isConnecting}
+                      className="h-7 w-7 bg-[#1f1f22] border border-[#2f2f32] hover:bg-[#2a2a2d]"
+                    >
+                      <User size={16} className="text-white" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent
+                    align="end"
+                    className="w-56 bg-[#1f1f22] border-[#2f2f32]"
+                  >
+                    <DropdownMenuItem className="text-white focus:bg-[#2a2a2d]">
+                      <Mail size={16} className="mr-2 text-[#9ca3af]" />
+                      <span>{userEmail || "Connected"}</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator className="bg-[#2f2f32]" />
+                    <DropdownMenuItem
+                      className="text-[#ef4444] focus:bg-[#2a1a1a] focus:text-[#ef4444]"
+                      onClick={handleLogoutOrLogin}
+                    >
+                      <LogOut size={16} className="mr-2" />
+                      <span>Logout</span>
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              ) : (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={handleLogoutOrLogin}
+                  aria-label="Login"
+                  disabled={isConnecting}
+                  className="h-7 w-7 bg-[#1f1f22] border border-[#2f2f32] hover:bg-[#2a2a2d]"
+                >
+                  <User size={16} className="text-white" />
+                </Button>
+              )}
             </div>
           </header>
 
@@ -799,34 +1098,39 @@ export default function WalletScreen() {
           </section>
 
           {/* Buy Button */}
-          <button
+          <Button
             onClick={handleBuyLook}
             disabled={buyState === "loading" || isConnecting}
-            className="buy-button"
+            className="w-full bg-[#f6ad27] text-[#1a1a1a] hover:bg-[#f6ad27]/90 h-14 text-base font-semibold rounded-2xl"
           >
+            <ShoppingCart size={18} className="mr-2" />
             {isConnecting
               ? "CONNECTING..."
               : buyState === "loading"
               ? "BUYING..."
               : "BUY $LOOK"}
-          </button>
+          </Button>
 
           {/* Action Buttons */}
-          <div className="action-buttons">
-            <button
+          <div className="flex gap-3 mt-4">
+            <Button
               onClick={() => setActiveModal("send")}
-              className="action-btn"
+              variant="secondary"
               disabled={!walletAddress}
+              className="flex-1 bg-[#1f1f22] text-white hover:bg-[#2a2a2d] h-12 rounded-2xl"
             >
+              <Send size={18} className="mr-1.5" />
               <span>Send</span>
-            </button>
-            <button
+            </Button>
+            <Button
               onClick={() => setActiveModal("receive")}
-              className="action-btn"
+              variant="secondary"
               disabled={!walletAddress}
+              className="flex-1 bg-[#1f1f22] text-white hover:bg-[#2a2a2d] h-12 rounded-2xl"
             >
+              <ArrowDownCircle size={18} className="mr-1.5" />
               <span>Receive</span>
-            </button>
+            </Button>
           </div>
 
           {/* Assets Section */}
@@ -880,21 +1184,25 @@ export default function WalletScreen() {
                     </p>
                   </div>
                 </div>
-                <div className="sol-actions">
-                  <button
+                <div className="flex gap-2 mt-3">
+                  <Button
                     onClick={handleBuySol}
                     disabled={swapState === "loading"}
-                    className="sol-action-btn"
+                    variant="outline"
+                    className="flex-1 bg-[#27272a] border-[#3f3f46] text-white hover:bg-[#3f3f46] h-10 rounded-xl"
                   >
-                    Buy $Sol
-                  </button>
-                  <button
+                    <ShoppingCart size={16} className="mr-1.5" />
+                    Buy $SOL
+                  </Button>
+                  <Button
                     onClick={handleSwapSol}
                     disabled={swapState === "loading"}
-                    className="sol-action-btn"
+                    variant="outline"
+                    className="flex-1 bg-[#27272a] border-[#3f3f46] text-white hover:bg-[#3f3f46] h-10 rounded-xl"
                   >
-                    Swap $Sol
-                  </button>
+                    <ArrowLeftRight size={16} className="mr-1.5" />
+                    Swap $SOL
+                  </Button>
                 </div>
               </div>
             </div>
@@ -930,100 +1238,105 @@ export default function WalletScreen() {
         </div>
 
         {/* Send Modal */}
-        {activeModal === "send" && walletAddress && (
-          <div className="modal-overlay" onClick={() => setActiveModal(null)}>
-            <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-              <div className="modal-header">
-                <h3>Send LOOK</h3>
-                <button
-                  onClick={() => setActiveModal(null)}
-                  className="close-btn"
-                >
-                  ×
-                </button>
-              </div>
-              <div className="modal-body">
-                {isScanning && (
-                  <div className="qr-scanner">
-                    <video ref={videoRef} className="scanner-video" />
-                    <button onClick={stopScan} className="stop-scan-btn">
-                      Stop Scanning
-                    </button>
-                  </div>
-                )}
-                {!isScanning && (
-                  <>
-                    <button onClick={startScan} className="scan-qr-btn">
-                      Scan QR Code
-                    </button>
-                    <input
-                      value={sendForm.address}
-                      onChange={(e) =>
-                        setSendForm((prev) => ({
-                          ...prev,
-                          address: e.target.value,
-                        }))
-                      }
-                      placeholder="Recipient wallet address"
-                      className="modal-input"
-                    />
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={sendForm.amount}
-                      onChange={(e) =>
-                        setSendForm((prev) => ({
-                          ...prev,
-                          amount: e.target.value,
-                        }))
-                      }
-                      placeholder="Amount in LOOK"
-                      className="modal-input"
-                    />
-                    <button
-                      onClick={handleSendUSDC}
-                      disabled={sendState === "loading"}
-                      className="modal-submit-btn"
-                    >
-                      {sendState === "loading" ? "Sending..." : "Send LOOK"}
-                    </button>
-                  </>
-                )}
-              </div>
+        <Dialog
+          open={activeModal === "send"}
+          onOpenChange={(open) => !open && setActiveModal(null)}
+        >
+          <DialogContent className="bg-[#1c1c1f] border-[#2f2f32] text-white max-w-md">
+            <DialogHeader>
+              <DialogTitle className="text-white">Send LOOK</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              {isScanning && (
+                <div className="qr-scanner">
+                  <video ref={videoRef} className="scanner-video" />
+                  <Button
+                    onClick={stopScan}
+                    variant="secondary"
+                    className="w-full mt-2"
+                  >
+                    Stop Scanning
+                  </Button>
+                </div>
+              )}
+              {!isScanning && (
+                <>
+                  <Button
+                    onClick={startScan}
+                    variant="outline"
+                    className="w-full bg-[#2a2a2d] border-[#4a4a4f] text-white hover:bg-[#3a3a3d]"
+                  >
+                    Scan QR Code
+                  </Button>
+                  <Input
+                    value={sendForm.address}
+                    onChange={(e) =>
+                      setSendForm((prev) => ({
+                        ...prev,
+                        address: e.target.value,
+                      }))
+                    }
+                    placeholder="Recipient wallet address"
+                    className="bg-[#1f1f22] border-[#2f2f32] text-white placeholder:text-gray-500"
+                  />
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={sendForm.amount}
+                    onChange={(e) =>
+                      setSendForm((prev) => ({
+                        ...prev,
+                        amount: e.target.value,
+                      }))
+                    }
+                    placeholder="Amount in LOOK"
+                    className="bg-[#1f1f22] border-[#2f2f32] text-white placeholder:text-gray-500"
+                  />
+                  <Button
+                    onClick={handleSendUSDC}
+                    disabled={sendState === "loading"}
+                    className="w-full bg-[#f6ad27] text-[#1a1a1a] hover:bg-[#f6ad27]/90"
+                  >
+                    {sendState === "loading" ? "Sending..." : "Send LOOK"}
+                  </Button>
+                </>
+              )}
             </div>
-          </div>
-        )}
+          </DialogContent>
+        </Dialog>
 
         {/* Receive Modal */}
-        {activeModal === "receive" && walletAddress && (
-          <div className="modal-overlay" onClick={() => setActiveModal(null)}>
-            <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-              <div className="modal-header">
-                <h3>Receive LOOK</h3>
-                <button
-                  onClick={() => setActiveModal(null)}
-                  className="close-btn"
-                >
-                  ×
-                </button>
-              </div>
-              <div className="modal-body">
-                {qrCodeUrl && (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={qrCodeUrl}
-                    alt="Wallet QR Code"
-                    className="qr-code"
-                  />
-                )}
-                <p className="wallet-address">{walletAddress}</p>
-                <button onClick={copyAddress} className="copy-btn">
-                  Copy Address
-                </button>
-              </div>
+        <Dialog
+          open={activeModal === "receive"}
+          onOpenChange={(open) => !open && setActiveModal(null)}
+        >
+          <DialogContent className="bg-[#1c1c1f] border-[#2f2f32] text-white max-w-md">
+            <DialogHeader>
+              <DialogTitle className="text-white">Receive LOOK</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 text-center">
+              {qrCodeUrl && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={qrCodeUrl}
+                  alt="Wallet QR Code"
+                  className="qr-code mx-auto"
+                />
+              )}
+              <p className="wallet-address text-sm break-all text-gray-300">
+                {walletAddress}
+              </p>
+              <Button
+                onClick={copyAddress}
+                variant="secondary"
+                className="w-full bg-[#1f1f22] text-white hover:bg-[#2a2a2d]"
+              >
+                <Copy size={18} className="mr-2" />
+                Copy Address
+              </Button>
             </div>
-          </div>
-        )}
+          </DialogContent>
+        </Dialog>
 
         <style jsx>{`
           .wallet-container {
@@ -1136,6 +1449,63 @@ export default function WalletScreen() {
             opacity: 0.4;
           }
 
+          .profile-dropdown {
+            position: absolute;
+            top: calc(100% + 8px);
+            right: 0;
+            background: #1f1f22;
+            border: 1px solid #2f2f32;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+            min-width: 200px;
+            z-index: 1000;
+            overflow: hidden;
+          }
+
+          .profile-dropdown-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px 16px;
+            color: #ffffff;
+            font-size: 14px;
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            width: 100%;
+            text-align: left;
+            transition: background-color 0.2s;
+            line-height: 1.5;
+          }
+
+          .profile-dropdown-item:hover {
+            background-color: #2a2a2d;
+          }
+
+          .profile-email {
+            color: #ffffff;
+            font-weight: 500;
+          }
+
+          .profile-dropdown-divider {
+            height: 1px;
+            background-color: #2f2f32;
+            margin: 0;
+          }
+
+          .profile-logout-btn {
+            color: #ef4444;
+          }
+
+          .profile-logout-btn:hover {
+            background-color: #2a1a1a;
+          }
+
+          .profile-logout-text {
+            color: #ef4444;
+            font-weight: 600;
+          }
+
           .balance-section {
             text-align: center;
             margin-bottom: 24px;
@@ -1153,11 +1523,17 @@ export default function WalletScreen() {
             color: #ffffff;
             margin-bottom: 12px;
             letter-spacing: -1px;
+            display: flex;
+            align-items: baseline;
+            justify-content: center;
+            gap: 0;
           }
 
           .balance-currency {
             color: #f6ad27;
-            margin-right: 4px;
+            margin-right: 2px;
+            display: inline-block;
+            line-height: 1;
           }
 
           .look-balance {
@@ -1194,6 +1570,9 @@ export default function WalletScreen() {
             cursor: pointer;
             margin-bottom: 16px;
             transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
           }
 
           .buy-button:hover:not(:disabled) {
@@ -1361,7 +1740,9 @@ export default function WalletScreen() {
             cursor: pointer;
             padding: 8px 12px;
             transition: all 0.2s;
-            text-align: center;
+            display: flex;
+            align-items: center;
+            justify-content: center;
           }
 
           .sol-action-btn:hover:not(:disabled) {
@@ -1444,10 +1825,16 @@ export default function WalletScreen() {
             background: transparent;
             border: none;
             color: #9ca3af;
-            font-size: 32px;
             cursor: pointer;
             line-height: 1;
-            padding: 0;
+            padding: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+          }
+
+          .close-btn:hover {
+            color: #ffffff;
           }
 
           .modal-body {
