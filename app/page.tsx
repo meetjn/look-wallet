@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Script from "next/script";
 import Image from "next/image";
+import { LogOut, QrCode } from "lucide-react";
 import { Buffer } from "buffer";
 import {
   Connection,
@@ -762,32 +763,20 @@ export default function WalletScreen() {
               <button
                 type="button"
                 className="header-icon-btn"
-                onClick={handleLogoutOrLogin}
-                aria-label={walletAddress ? "Logout" : "Login"}
-                disabled={isConnecting}
-              >
-                <Image
-                  src="/account-logout.png"
-                  alt={walletAddress ? "Logout" : "Login"}
-                  width={16}
-                  height={16}
-                  className="header-icon"
-                />
-              </button>
-              <button
-                type="button"
-                className="header-icon-btn"
                 onClick={() => setActiveModal("receive")}
                 aria-label="Show wallet QR"
                 disabled={!walletAddress}
               >
-                <Image
-                  src="/qr-code-logo.png"
-                  alt="QR Code"
-                  width={16}
-                  height={16}
-                  className="header-icon"
-                />
+                <QrCode className="header-icon" size={16} color="#ffffff" />
+              </button>
+              <button
+                type="button"
+                className="header-icon-btn"
+                onClick={handleLogoutOrLogin}
+                aria-label={walletAddress ? "Logout" : "Login"}
+                disabled={isConnecting}
+              >
+                <LogOut className="header-icon" size={16} color="#ffffff" />
               </button>
             </div>
           </header>
@@ -1130,14 +1119,21 @@ export default function WalletScreen() {
           .header-icon {
             width: 16px;
             height: 16px;
-            object-fit: contain;
-            filter: brightness(2) contrast(1.2) invert(1);
-            opacity: 0.8;
+            color: #ffffff !important;
+            stroke: #ffffff !important;
+            stroke-width: 2;
+            fill: none;
           }
 
           .header-icon-btn:hover:not(:disabled) .header-icon {
-            opacity: 1;
-            filter: brightness(2.2) contrast(1.3) invert(1);
+            color: #ffffff !important;
+            stroke: #ffffff !important;
+          }
+
+          .header-icon-btn:disabled .header-icon {
+            color: #ffffff !important;
+            stroke: #ffffff !important;
+            opacity: 0.4;
           }
 
           .balance-section {

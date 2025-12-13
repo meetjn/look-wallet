@@ -12,6 +12,7 @@
     "@solana/spl-token": "^0.4.9",
     "@solana/web3.js": "^1.95.8",
     "jsqr": "^1.4.0",
+    "lucide-react": "^0.561.0",
     "next": "15.1.9",
     "qrcode": "^1.5.4",
     "react": "^19.0.0",
@@ -29,4 +30,3 @@
     "typescript": "^5"
   }
 }
-
