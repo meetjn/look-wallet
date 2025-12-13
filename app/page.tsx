@@ -1051,9 +1051,14 @@ export default function WalletScreen() {
                     align="end"
                     className="w-56 bg-[#1f1f22] border-[#2f2f32]"
                   >
-                    <DropdownMenuItem className="text-white focus:bg-[#2a2a2d]">
-                      <Mail size={16} className="mr-2 text-[#9ca3af]" />
-                      <span>{userEmail || "Connected"}</span>
+                    <DropdownMenuItem className="text-white focus:bg-[#2a2a2d] flex items-center gap-2">
+                      <Mail
+                        size={16}
+                        className="text-[#9ca3af] flex-shrink-0"
+                      />
+                      <span className="truncate">
+                        {userEmail || "Connected"}
+                      </span>
                     </DropdownMenuItem>
                     <DropdownMenuSeparator className="bg-[#2f2f32]" />
                     <DropdownMenuItem
@@ -1112,7 +1117,7 @@ export default function WalletScreen() {
           </Button>
 
           {/* Action Buttons */}
-          <div className="flex gap-3 mt-4">
+          <div className="flex gap-3 mt-4 mb-8">
             <Button
               onClick={() => setActiveModal("send")}
               variant="secondary"
